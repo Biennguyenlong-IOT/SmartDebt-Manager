@@ -1,0 +1,5 @@
+{
+  "name": "SmartDebt Manager",
+  "description": "Một ứng dụng hiện đại để quản lý các khoản nợ và cho vay, tích hợp AI để tư vấn kế hoạch trả nợ thông minh.",
+  "requestFramePermissions": []
+}
