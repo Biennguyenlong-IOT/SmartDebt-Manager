@@ -26,7 +26,8 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, debts, onRecordPayment }) 
     return acc;
   }, {} as Record<string, { name: string; borrowed: number; lent: number }>);
 
-  const topPartners = Object.values(partnerStats)
+  // Added explicit type cast to fix "Property does not exist on type unknown" errors in TypeScript environments where Object.values inference is limited
+  const topPartners = (Object.values(partnerStats) as Array<{ name: string; borrowed: number; lent: number }>)
     .sort((a, b) => (b.borrowed + b.lent) - (a.borrowed + a.lent))
     .slice(0, 5);
 
