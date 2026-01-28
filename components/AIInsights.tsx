@@ -32,7 +32,7 @@ const AIInsights: React.FC<AIInsightsProps> = ({ debts }) => {
           </div>
           <div>
             <h3 className="text-lg font-bold text-slate-800">Cố vấn Tài chính AI</h3>
-            <p className="text-xs text-indigo-600">Phân tích chuyên sâu bởi Gemini 3 Flash</p>
+            <p className="text-xs text-indigo-600">Phân tích chuyên sâu bởi Gemini 3 Pro</p>
           </div>
         </div>
         <button 
