@@ -53,15 +53,15 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isCloud = fa
           <div className="flex items-center gap-2 mb-2">
             <div className={`w-2 h-2 rounded-full ${isCloud ? 'bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,1)]' : firebaseError ? 'bg-red-500' : 'bg-amber-500'}`}></div>
             <p className={`text-[10px] uppercase font-bold tracking-wider ${isCloud ? 'text-emerald-600' : firebaseError ? 'text-red-600' : 'text-amber-600'}`}>
-              {isCloud ? 'Cloud Synced' : firebaseError ? 'Sync Error' : 'Local Storage'}
+              {isCloud ? 'Cloud Connected' : firebaseError ? 'Sync Error' : 'Local Mode'}
             </p>
           </div>
           <p className="text-[11px] text-slate-500 leading-relaxed font-medium">
             {isCloud 
-              ? 'Dữ liệu được bảo mật trực tuyến.' 
+              ? 'Dữ liệu đã an toàn. Hãy nhớ thiết lập Rules bảo mật trên Console.' 
               : firebaseError 
-              ? 'Hãy bật Firestore Database trên Console để kích hoạt Cloud.' 
-              : 'Vui lòng cấu hình Firebase để bật tính năng đồng bộ.'}
+              ? 'Vui lòng kiểm tra lại cấu hình Firestore Database.' 
+              : 'Dùng Local Storage. Dữ liệu có thể mất nếu xóa cache trình duyệt.'}
           </p>
           {firebaseError && (
             <a 
