@@ -64,16 +64,35 @@ app.post("/api/ai-insights", async (req, res) => {
       Trả lời bằng tiếng Việt, ngắn gọn, súc tích và chuyên nghiệp dưới dạng Markdown.
     `;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-      config: {
-        temperature: 0.7,
-        topP: 0.95,
-      }
-    });
+    let textResult = "";
+    const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+    let lastError: any = null;
 
-    return res.json({ text: response.text });
+    for (const model of modelsToTry) {
+      try {
+        const response = await ai.models.generateContent({
+          model,
+          contents: prompt,
+          config: {
+            temperature: 0.7,
+            topP: 0.95,
+          }
+        });
+        if (response.text) {
+          textResult = response.text;
+          break;
+        }
+      } catch (err: any) {
+        console.warn(`Model ${model} failed, trying next...`, err?.message);
+        lastError = err;
+      }
+    }
+
+    if (!textResult) {
+      throw lastError || new Error("Không nhận được phản hồi từ AI.");
+    }
+
+    return res.json({ text: textResult });
   } catch (error: any) {
     console.error("Gemini Server Error:", error);
     return res.status(500).json({
@@ -85,6 +104,12 @@ app.post("/api/ai-insights", async (req, res) => {
 // Return 404 JSON for unmatched /api requests
 app.use("/api", (req, res) => {
   res.status(404).json({ error: "API endpoint không tồn tại." });
+});
+
+// Global error handler for Express (always return JSON)
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error("Global Express Error:", err);
+  res.status(500).json({ error: err?.message || "Lỗi máy chủ nội bộ." });
 });
 
 async function startServer() {
