@@ -23,7 +23,7 @@ export const getDebtAdvice = async (debts: Debt[]): Promise<string> => {
       console.error("Non-JSON response from /api/ai-insights:", response.status, errorText);
       
       if (response.status === 404) {
-        return "Máy chủ API không tìm thấy endpoint /api/ai-insights. Vui lòng làm mới lại trang.";
+        return "Máy chủ không tìm thấy API endpoint /api/ai-insights. Nếu triển khai trên Vercel, vui lòng đảm bảo đã thêm GEMINI_API_KEY trong Vercel Project Settings.";
       }
       
       return `Máy chủ trả về lỗi (${response.status}). Vui lòng kiểm tra lại GEMINI_API_KEY trong Cài đặt.`;
