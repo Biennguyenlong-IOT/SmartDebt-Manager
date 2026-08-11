@@ -10,21 +10,27 @@ export const getDebtAdvice = async (debts: Debt[]): Promise<string> => {
       body: JSON.stringify({ debts }),
     });
 
-    const contentType = response.headers.get("content-type");
-    if (!contentType || !contentType.includes("application/json")) {
-      console.error("Non-JSON response received from /api/ai-insights");
-      return "Không thể truy cập máy chủ API AI. Vui lòng thử lại sau.";
+    const contentType = response.headers.get("content-type") || "";
+
+    if (contentType.includes("application/json")) {
+      const data = await response.json();
+      if (!response.ok) {
+        return data.error || "Không thể kết nối với trí tuệ nhân tạo lúc này. Vui lòng kiểm tra lại API Key.";
+      }
+      return data.text || "Không có phản hồi từ AI.";
+    } else {
+      const errorText = await response.text();
+      console.error("Non-JSON response from /api/ai-insights:", response.status, errorText);
+      
+      if (response.status === 404) {
+        return "Máy chủ API không tìm thấy endpoint /api/ai-insights. Vui lòng làm mới lại trang.";
+      }
+      
+      return `Máy chủ trả về lỗi (${response.status}). Vui lòng kiểm tra lại GEMINI_API_KEY trong Cài đặt.`;
     }
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      return data.error || "Không thể kết nối với trí tuệ nhân tạo lúc này. Vui lòng kiểm tra lại API Key.";
-    }
-
-    return data.text || "Không có phản hồi từ AI.";
-  } catch (error) {
+  } catch (error: any) {
     console.error("Gemini Service Error:", error);
     return "Không thể kết nối với máy chủ AI. Vui lòng kiểm tra kết nối mạng và thử lại sau.";
   }
 };
+
