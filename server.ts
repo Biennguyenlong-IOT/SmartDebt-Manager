@@ -42,7 +42,14 @@ apiRouter.post("/ai-insights", async (req, res) => {
       return res.status(400).json({ error: "Dữ liệu khoản nợ không hợp lệ." });
     }
 
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({ 
+      apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        }
+      }
+    });
 
     const debtContext = debts.map((d: any) => ({
       title: d.title,
@@ -68,7 +75,7 @@ apiRouter.post("/ai-insights", async (req, res) => {
     `;
 
     let textResult = "";
-    const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+    const modelsToTry = ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.1-pro-preview'];
     let lastError: any = null;
 
     for (const model of modelsToTry) {
