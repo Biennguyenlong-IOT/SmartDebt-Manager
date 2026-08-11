@@ -75,26 +75,41 @@ apiRouter.post("/ai-insights", async (req, res) => {
     `;
 
     let textResult = "";
-    const modelsToTry = ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.1-pro-preview'];
+    const modelsToTry = ['gemini-3.6-flash', 'gemini-3.6-pro', 'gemini-2.5-pro', 'gemini-flash-latest'];
     let lastError: any = null;
 
     for (const model of modelsToTry) {
-      try {
-        const response = await ai.models.generateContent({
-          model,
-          contents: prompt,
-          config: {
-            temperature: 0.7,
-            topP: 0.95,
+      // Try up to 3 times per model for transient errors like 503 / 429
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          const response = await ai.models.generateContent({
+            model,
+            contents: prompt,
+            config: {
+              temperature: 0.7,
+              topP: 0.95,
+            }
+          });
+          if (response.text) {
+            textResult = response.text;
+            break;
           }
-        });
-        if (response.text) {
-          textResult = response.text;
+        } catch (err: any) {
+          lastError = err;
+          const status = err?.status || err?.code || (err?.message?.includes("503") ? 503 : 0);
+          console.warn(`Model ${model} attempt ${attempt} failed:`, err?.message || err);
+          
+          // If transient 503 / 429 error, wait before retrying
+          if ((status === 503 || status === 429 || err?.message?.includes("503") || err?.message?.includes("UNAVAILABLE")) && attempt < 3) {
+            await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
+            continue;
+          }
+          // If NOT a transient error or last attempt, break to try next model
           break;
         }
-      } catch (err: any) {
-        console.warn(`Model ${model} failed:`, err?.message || err);
-        lastError = err;
+      }
+      if (textResult) {
+        break;
       }
     }
 
