@@ -1,60 +1,103 @@
 import { GoogleGenAI } from "@google/genai";
 
-export async function handleAiInsightsRequest(req: any, res: any) {
-  // CORS Headers
-  if (res.setHeader) {
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  }
-
-  if (req.method === "OPTIONS") {
-    if (res.status) {
-      return res.status(200).end();
-    }
-    return res.end();
-  }
-
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Chỉ hỗ trợ phương thức POST." });
-  }
-
+function sendJson(res: any, statusCode: number, data: any) {
   try {
-    const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+    if (res.setHeader && !res.headersSent) {
+      res.setHeader("Content-Type", "application/json; charset=utf-8");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    }
+    if (typeof res.status === "function") {
+      res.status(statusCode);
+    } else {
+      res.statusCode = statusCode;
+    }
+    if (typeof res.json === "function") {
+      return res.json(data);
+    } else {
+      return res.end(JSON.stringify(data));
+    }
+  } catch (e) {
+    console.error("Error sending response:", e);
+    try {
+      res.statusCode = statusCode;
+      res.end(JSON.stringify(data));
+    } catch (_) {}
+  }
+}
+
+async function getParsedBody(req: any): Promise<any> {
+  try {
+    if (req.body) {
+      if (typeof req.body === "object") return req.body;
+      if (typeof req.body === "string") {
+        try { return JSON.parse(req.body); } catch (_) {}
+      }
+    }
+    if (typeof req.on === "function") {
+      return new Promise((resolve) => {
+        let data = "";
+        req.on("data", (chunk: any) => { data += chunk; });
+        req.on("end", () => {
+          try { resolve(JSON.parse(data)); } catch (_) { resolve({}); }
+        });
+        req.on("error", () => resolve({}));
+      });
+    }
+  } catch (_) {}
+  return {};
+}
+
+export async function handleAiInsightsRequest(req: any, res: any) {
+  try {
+    // Handle CORS preflight
+    if (req.method === "OPTIONS") {
+      if (res.setHeader && !res.headersSent) {
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+      }
+      if (typeof res.status === "function") {
+        return res.status(200).end();
+      }
+      res.statusCode = 200;
+      return res.end();
+    }
+
+    if (req.method !== "POST") {
+      return sendJson(res, 405, { error: "Chỉ hỗ trợ phương thức POST." });
+    }
+
+    const apiKey = (process.env.GEMINI_API_KEY || process.env.API_KEY || "").trim();
     if (!apiKey) {
-      return res.status(400).json({
-        error: "Chưa nhận được GEMINI_API_KEY trên Vercel. Vui lòng kiểm tra lại Settings -> Environment Variables trên Vercel (đảm bảo gõ đúng tên GEMINI_API_KEY) và chọn Redeploy."
+      return sendJson(res, 400, {
+        error: "Biến môi trường GEMINI_API_KEY chưa có trên Vercel. Vui lòng vào Vercel Project Settings -> Environment Variables, thêm GEMINI_API_KEY, sau đó vào tab Deployments chọn Redeploy."
       });
     }
 
-    let body = req.body;
-    if (typeof body === "string") {
-      try {
-        body = JSON.parse(body);
-      } catch (e) {
-        return res.status(400).json({ error: "Dữ liệu JSON gửi lên không hợp lệ." });
-      }
-    }
-
+    const body = await getParsedBody(req);
     const debts = body?.debts;
+
     if (!debts || !Array.isArray(debts)) {
-      return res.status(400).json({ error: "Dữ liệu danh sách khoản nợ không hợp lệ." });
+      return sendJson(res, 400, { error: "Dữ liệu danh sách khoản nợ không hợp lệ." });
     }
 
-    const ai = new GoogleGenAI({ 
-      apiKey,
-      httpOptions: {
-        headers: {
-          'User-Agent': 'aistudio-build',
-        }
-      }
-    });
+    let ai: GoogleGenAI;
+    try {
+      ai = new GoogleGenAI({ apiKey });
+    } catch (initErr: any) {
+      console.error("GoogleGenAI Init Error:", initErr);
+      return sendJson(res, 400, {
+        error: `Không thể khởi tạo Gemini SDK (${initErr?.message || "Khóa API không hợp lệ"}).`
+      });
+    }
 
     const debtContext = debts.map((d: any) => ({
-      title: d.title,
-      person: d.person,
-      amount: d.amount,
-      remaining: d.remainingAmount,
+      title: d.title || "Khoản nợ",
+      person: d.person || "N/A",
+      amount: d.amount || 0,
+      remaining: d.remainingAmount ?? d.amount ?? 0,
       type: d.type === 'BORROWED' ? 'Tôi nợ' : 'Họ nợ tôi',
       interest: (d.interestRate || 0) + '%',
       dueDate: d.dueDate || 'Không có'
@@ -94,10 +137,10 @@ export async function handleAiInsightsRequest(req: any, res: any) {
           }
         } catch (err: any) {
           lastError = err;
-          const status = err?.status || err?.code || (err?.message?.includes("503") ? 503 : 0);
-          console.warn(`Model ${model} attempt ${attempt} failed:`, err?.message || err);
+          const errMsg = err?.message || String(err);
+          console.warn(`Model ${model} attempt ${attempt} failed:`, errMsg);
           
-          if ((status === 503 || status === 429 || err?.message?.includes("503") || err?.message?.includes("UNAVAILABLE")) && attempt < 3) {
+          if ((errMsg.includes("503") || errMsg.includes("429") || errMsg.includes("UNAVAILABLE")) && attempt < 3) {
             await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
             continue;
           }
@@ -110,14 +153,17 @@ export async function handleAiInsightsRequest(req: any, res: any) {
     }
 
     if (!textResult) {
-      throw lastError || new Error("Không thể kết nối với AI Gemini. Vui lòng kiểm tra lại API Key.");
+      const detailMsg = lastError?.message || "Không thể khởi tạo nội dung AI.";
+      return sendJson(res, 500, {
+        error: `Lỗi kết nối Gemini API: ${detailMsg}. Vui lòng kiểm tra lại GEMINI_API_KEY trên Vercel.`
+      });
     }
 
-    return res.status(200).json({ text: textResult });
+    return sendJson(res, 200, { text: textResult });
   } catch (error: any) {
-    console.error("Gemini Server Error:", error);
-    return res.status(500).json({
-      error: error?.message || "Lỗi xử lý AI trên máy chủ serverless."
+    console.error("Top-level Gemini Handler Error:", error);
+    return sendJson(res, 500, {
+      error: `Lỗi máy chủ serverless: ${error?.message || "Không thể xử lý yêu cầu."}`
     });
   }
 }
