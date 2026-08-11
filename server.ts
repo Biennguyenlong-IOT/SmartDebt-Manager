@@ -19,22 +19,25 @@ app.use((req, res, next) => {
   next();
 });
 
+// API Router
+const apiRouter = express.Router();
+
 // Health check endpoint
-app.get("/api/health", (req, res) => {
+apiRouter.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
 // API route for AI debt advice
-app.post("/api/ai-insights", async (req, res) => {
+apiRouter.post("/ai-insights", async (req, res) => {
   try {
     const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
     if (!apiKey) {
       return res.status(400).json({
-        error: "Chưa cấu hình GEMINI_API_KEY. Vui lòng thiết lập API Key trong cài đặt môi trường."
+        error: "Chưa cấu hình GEMINI_API_KEY. Vui lòng thêm GEMINI_API_KEY trong menu Cài đặt (Settings)."
       });
     }
 
-    const { debts } = req.body;
+    const { debts } = req.body || {};
     if (!debts || !Array.isArray(debts)) {
       return res.status(400).json({ error: "Dữ liệu khoản nợ không hợp lệ." });
     }
@@ -47,8 +50,8 @@ app.post("/api/ai-insights", async (req, res) => {
       amount: d.amount,
       remaining: d.remainingAmount,
       type: d.type === 'BORROWED' ? 'Tôi nợ' : 'Họ nợ tôi',
-      interest: d.interestRate + '%',
-      dueDate: d.dueDate
+      interest: (d.interestRate || 0) + '%',
+      dueDate: d.dueDate || 'Không có'
     }));
 
     const prompt = `
@@ -83,13 +86,13 @@ app.post("/api/ai-insights", async (req, res) => {
           break;
         }
       } catch (err: any) {
-        console.warn(`Model ${model} failed, trying next...`, err?.message);
+        console.warn(`Model ${model} failed:`, err?.message || err);
         lastError = err;
       }
     }
 
     if (!textResult) {
-      throw lastError || new Error("Không nhận được phản hồi từ AI.");
+      throw lastError || new Error("Không thể tạo phản hồi từ AI.");
     }
 
     return res.json({ text: textResult });
@@ -101,10 +104,13 @@ app.post("/api/ai-insights", async (req, res) => {
   }
 });
 
-// Return 404 JSON for unmatched /api requests
-app.use("/api", (req, res) => {
+// Fallback for non-existent API endpoints
+apiRouter.use((req, res) => {
   res.status(404).json({ error: "API endpoint không tồn tại." });
 });
+
+// Mount API router at /api
+app.use("/api", apiRouter);
 
 // Global error handler for Express (always return JSON)
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -123,9 +129,6 @@ async function startServer() {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
     app.use((req, res, next) => {
-      if (req.path.startsWith('/api')) {
-        return res.status(404).json({ error: "API endpoint không tồn tại." });
-      }
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
