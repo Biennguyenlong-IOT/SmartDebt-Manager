@@ -8,6 +8,22 @@ const PORT = 3000;
 
 app.use(express.json());
 
+// CORS middleware
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
+// Health check endpoint
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok" });
+});
+
 // API route for AI debt advice
 app.post("/api/ai-insights", async (req, res) => {
   try {
@@ -66,6 +82,11 @@ app.post("/api/ai-insights", async (req, res) => {
   }
 });
 
+// Return 404 JSON for unmatched /api requests
+app.use("/api", (req, res) => {
+  res.status(404).json({ error: "API endpoint không tồn tại." });
+});
+
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
@@ -76,7 +97,10 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.use((req, res) => {
+    app.use((req, res, next) => {
+      if (req.path.startsWith('/api')) {
+        return res.status(404).json({ error: "API endpoint không tồn tại." });
+      }
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
