@@ -1,6 +1,6 @@
 import express from "express";
 import path from "path";
-import { handleAiInsightsRequest } from "./services/aiInsightsHandler.js";
+import { handleAiInsightsRequest } from "./api/ai-insights";
 
 const app = express();
 const PORT = 3000;
