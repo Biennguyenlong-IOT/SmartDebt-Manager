@@ -10,6 +10,12 @@ export const getDebtAdvice = async (debts: Debt[]): Promise<string> => {
       body: JSON.stringify({ debts }),
     });
 
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      console.error("Non-JSON response received from /api/ai-insights");
+      return "Không thể truy cập máy chủ API AI. Vui lòng thử lại sau.";
+    }
+
     const data = await response.json();
 
     if (!response.ok) {
