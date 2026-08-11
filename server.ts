@@ -22,13 +22,16 @@ app.use((req, res, next) => {
 // API Router
 const apiRouter = express.Router();
 
-// Health check endpoint
-apiRouter.get("/health", (req, res) => {
+// Health check handler
+const handleHealth = (req: express.Request, res: express.Response) => {
   res.json({ status: "ok" });
-});
+};
 
-// API route for AI debt advice
-apiRouter.post("/ai-insights", async (req, res) => {
+apiRouter.get("/health", handleHealth);
+app.get("/api/health", handleHealth);
+
+// API route handler for AI debt advice
+const handleAiInsights = async (req: express.Request, res: express.Response) => {
   try {
     const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
     if (!apiKey) {
@@ -124,7 +127,11 @@ apiRouter.post("/ai-insights", async (req, res) => {
       error: error?.message || "Không thể kết nối với trí tuệ nhân tạo lúc này. Vui lòng thử lại sau."
     });
   }
-});
+};
+
+apiRouter.post("/ai-insights", handleAiInsights);
+app.post("/api/ai-insights", handleAiInsights);
+app.post("/ai-insights", handleAiInsights);
 
 // Fallback for non-existent API endpoints
 apiRouter.use((req, res) => {
@@ -139,6 +146,8 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   console.error("Global Express Error:", err);
   res.status(500).json({ error: err?.message || "Lỗi máy chủ nội bộ." });
 });
+
+export default app;
 
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
@@ -160,4 +169,6 @@ async function startServer() {
   });
 }
 
-startServer();
+if (process.env.VERCEL !== "1") {
+  startServer();
+}
